@@ -1,0 +1,435 @@
+/*
+ * Wrambi — sistema visivo.
+ *
+ * Due temi progettati separatamente: "Carta" (chiaro, inchiostro blu-nero su
+ * bianco neutro) e "Notte" (blu ardesia profondo, inchiostro chiaro). Il rosso
+ * di rubrica è riservato alle note: è l'unico colore forte dell'interfaccia.
+ */
+
+:root {
+  --ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'JetBrains Mono Variable', 'Cascadia Mono', Consolas, monospace;
+  --font: 'Literata Variable', Georgia, serif;
+  --fs: 19px;
+  --lh: 1.7;
+  --measure: 68ch;
+
+  --radius-s: 5px;
+  --radius-m: 8px;
+  --radius-l: 12px;
+  --bar-h: 42px;
+  --status-h: 28px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  color-scheme: light;
+}
+
+:root,
+:root[data-theme='light'] {
+  --page: #fcfcfb;
+  --ink: #1e2430;
+  --ink-2: #4e5766;
+  --ink-3: #8a92a0;
+  --ink-4: #b6bcc6;
+  --rule: #e4e7eb;
+  --chrome: #f4f5f7;
+  --chrome-2: #e9ecf0;
+  --raised: #ffffff;
+  /* Fogli delle anteprime nella Biblioteca. */
+  --sheet: #ffffff;
+  --scrim: rgba(30, 36, 48, 0.28);
+  --shadow: 0 1px 2px rgba(20, 28, 40, 0.06), 0 10px 30px rgba(20, 28, 40, 0.12);
+  --shadow-s: 0 1px 2px rgba(20, 28, 40, 0.08), 0 2px 8px rgba(20, 28, 40, 0.06);
+  --rubric: #c8102e;
+  --rubric-wash: rgba(200, 16, 46, 0.075);
+  --rubric-line: rgba(200, 16, 46, 0.55);
+  --link: #2450b2;
+  --sel: #d5e2fb;
+  --focus: #2f62d0;
+  --ok: #2e7d4f;
+  --warn: #9a5a00;
+  --unread: #8a92a0;
+  --reading: #2f62d0;
+  --read: #2e7d4f;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page: #1d2230;
+  --ink: #dce1ea;
+  --ink-2: #a5aebd;
+  --ink-3: #6b7486;
+  --ink-4: #4a5265;
+  --rule: #2e3546;
+  --chrome: #232a39;
+  --chrome-2: #2d3547;
+  --raised: #273042;
+  --sheet: #2c3548;
+  --scrim: rgba(8, 10, 16, 0.5);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.4);
+  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 10px rgba(0, 0, 0, 0.25);
+  --rubric: #ff7383;
+  --rubric-wash: rgba(255, 115, 131, 0.12);
+  --rubric-line: rgba(255, 115, 131, 0.7);
+  --link: #93b4ff;
+  --sel: #33436a;
+  --focus: #93b4ff;
+  --ok: #6fcf97;
+  --warn: #f2b45c;
+  --unread: #7a8396;
+  --reading: #93b4ff;
+  --read: #6fcf97;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  user-select: none;
+}
+
+#app {
+  height: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: default;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: var(--sel);
+}
+
+/* Barre di scorrimento sottili, coerenti con il tema. */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--chrome-2);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ink-4);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ───────────── Elementi di base dell'interfaccia ───────────── */
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink-2);
+  transition: background 120ms, color 120ms;
+}
+.icon-btn:hover {
+  background: var(--chrome-2);
+  color: var(--ink);
+}
+.icon-btn[aria-pressed='true'] {
+  background: var(--chrome-2);
+  color: var(--ink);
+}
+.icon-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.icon-btn svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.75;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-s);
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 120ms, border-color 120ms;
+}
+.btn:hover {
+  background: var(--chrome);
+}
+.btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.btn.primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--page);
+}
+.btn.primary:hover {
+  filter: brightness(1.15);
+}
+.btn.danger {
+  color: var(--rubric);
+}
+.btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+.field > span {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-s);
+  background: var(--page);
+  outline: none;
+}
+.input:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
+}
+
+.muted {
+  color: var(--ink-2);
+}
+.faint {
+  color: var(--ink-3);
+}
+.kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--chrome);
+  font-family: var(--ui);
+  font-size: 11px;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+/* Pannelli modali */
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  animation: fade 140ms var(--ease);
+}
+.scrim > .sheet {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow);
+  animation: rise 180ms var(--ease);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 10px 22px;
+}
+.sheet-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.sheet-body {
+  padding: 4px 22px 22px;
+}
+.sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--rule);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ───────────── Anteprima del documento (HTML) ───────────── */
+
+.doc-preview {
+  font-family: var(--font);
+  font-size: calc(var(--fs) * 0.9);
+  line-height: 1.6;
+  color: var(--ink);
+  user-select: text;
+}
+.doc-preview .footnotes,
+.doc-preview .references {
+  margin-top: 2.2em;
+  padding-top: 0.4em;
+  border-top: 1px solid var(--rule);
+}
+.doc-preview .footnotes ol {
+  padding-left: 1.4em;
+  font-size: 0.92em;
+}
+.doc-preview .footnotes li p {
+  margin: 0 0 0.4em;
+}
+.doc-preview sup.fnref {
+  line-height: 0;
+  font-size: 0.72em;
+}
+.doc-preview sup.fnref a,
+.doc-preview .fnback {
+  text-decoration: none;
+}
+.doc-preview .references .ref {
+  padding-left: 2em;
+  text-indent: -2em;
+  margin: 0 0 0.55em;
+}
+.doc-preview h1,
+.doc-preview h2,
+.doc-preview h3,
+.doc-preview h4,
+.doc-preview h5,
+.doc-preview h6 {
+  line-height: 1.25;
+  margin: 1.5em 0 0.5em;
+  font-weight: 650;
+}
+.doc-preview h1 {
+  font-size: 1.75em;
+  margin-top: 0.2em;
+}
+.doc-preview h2 {
+  font-size: 1.4em;
+}
+.doc-preview h3 {
+  font-size: 1.18em;
+}
+.doc-preview h4,
+.doc-preview h5,
+.doc-preview h6 {
+  font-size: 1em;
+}
+.doc-preview p {
+  margin: 0 0 0.85em;
+}
+.doc-preview a {
+  color: var(--link);
+}
+.doc-preview blockquote {
+  margin: 1.1em 0;
+  padding: 0.1em 0 0.1em 1em;
+  border-left: 3px solid var(--rule);
+  color: var(--ink-2);
+}
+.doc-preview code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: var(--chrome);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+.doc-preview pre {
+  background: var(--chrome);
+  padding: 0.8em 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.45;
+}
+.doc-preview pre code {
+  background: none;
+  padding: 0;
+}
+.doc-preview hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 2em 0;
+}
+.doc-preview table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.92em;
+}
+.doc-preview th,
+.doc-preview td {
+  border: 1px solid var(--rule);
+  padding: 0.3em 0.65em;
+}
+.doc-preview th {
+  background: var(--chrome);
+}
+.doc-preview .img-missing {
+  color: var(--ink-3);
+  font-style: italic;
+}

@@ -1,0 +1,52 @@
+[package]
+name = "wrambi"
+version = "0.2.0"
+description = "Calm writing, a document library, citations and notes linked to the text: an offline desktop app for Windows, macOS and Linux."
+authors = ["Stefano Coelati Rama"]
+edition = "2021"
+rust-version = "1.92"
+license = "MIT"
+
+[lib]
+# Il nome con suffisso _lib evita conflitti con il binario su Windows.
+name = "wrambi_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+walkdir = "2"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+# Vault cifrato
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+# PDF tipografico con Typst integrato (nessun programma esterno)
+typst = "0.15"
+typst-pdf = "0.15"
+typst-layout = "0.15"
+typst-kit = { version = "0.15", default-features = false, features = ["scan-fonts", "embedded-fonts"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+
+# In sviluppo Typst è molto lento senza ottimizzazioni: ottimizziamo le dipendenze.
+[profile.dev.package."*"]
+opt-level = 2
