@@ -9,6 +9,7 @@
     ImagePlus,
     Italic,
     MousePointer2,
+    NotebookPen,
     Redo2,
     RotateCcw,
     RotateCw,
@@ -26,6 +27,7 @@
   } from 'lucide';
   import Icon from '../Icon.svelte';
   import EditPage from './EditPage.svelte';
+  import { pageMarks } from '../../lib/reader/sync.svelte';
   import Thumb from './Thumb.svelte';
   import { backend, basename, dialogs } from '../../lib/backend';
   import { keys, t, tk, tn } from '../../lib/i18n';
@@ -64,11 +66,14 @@
     { id: 'edit', label: tk('Modifica testo'), icon: TextCursorInput, hint: tk('Clic su una riga per riscriverla: il testo nuovo prende il posto del vecchio, con un carattere simile.') },
     { id: 'text', label: tk('Aggiungi testo'), icon: Type, hint: tk('Clic dove vuoi scrivere. Carattere, dimensione e colore si scelgono qui sopra.') },
     { id: 'highlight', label: tk('Evidenzia'), icon: Highlighter, hint: tk('Trascina sul testo (o clic su una riga) per evidenziarlo.') },
+    { id: 'note', label: tk('Nota'), icon: NotebookPen, hint: tk('Seleziona il testo per scrivere una nota di Wrambi: non entra nel PDF, resta collegata al testo e si vede anche nelle viste Testo e Pagine.') },
     { id: 'cover', label: tk('Copri'), icon: Square, hint: tk('Trascina un rettangolo per coprire una parte della pagina con il colore dello sfondo.') },
     { id: 'image', label: tk('Immagine'), icon: ImagePlus, hint: tk('Sceglie un\'immagine PNG o JPEG e la mette nella pagina in vista; poi la sposti e la ridimensioni.') },
     { id: 'select', label: tk('Sposta'), icon: MousePointer2, hint: tk('Clic su una modifica per sceglierla, trascina per spostarla, Canc per toglierla.') },
   ];
   const hint = $derived(TOOLS.find((x) => x.id === pdfEdit.tool)?.hint ?? '');
+  /** Note di Wrambi sulle pagine originali (non fanno parte del PDF). */
+  const marks = $derived(pageMarks());
 
   const selectedOp = $derived(pdfEdit.ops.find((o) => o.id === pdfEdit.selected) ?? null);
   const textTarget = $derived(selectedOp && (selectedOp.kind === 'text' || selectedOp.kind === 'replace') ? selectedOp : null);
@@ -261,7 +266,7 @@
     <div class="scroller" bind:this={scroller} onscroll={onScroll}>
       <div class="stack">
         {#each pdfEdit.pages as p, i (p.id)}
-          <EditPage ref={p} width={pageWidth} number={i + 1} />
+          <EditPage ref={p} width={pageWidth} number={i + 1} marks={p.src === 0 ? marks.filter((m) => m.page === p.index) : []} />
         {/each}
       </div>
     </div>

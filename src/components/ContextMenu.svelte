@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { PenLine, MessageSquareText, Trash2, FileOutput } from 'lucide';
+  import { PenLine, MessageSquareText, Trash2, FileOutput, NotebookPen, Highlighter } from 'lucide';
   import Icon from './Icon.svelte';
   import { ui } from '../lib/state.svelte';
 
-  const ICONS = { open: MessageSquareText, edit: PenLine, delete: Trash2, export: FileOutput };
+  const ICONS = { open: MessageSquareText, edit: PenLine, delete: Trash2, export: FileOutput, note: NotebookPen, highlight: Highlighter };
 
   let menu: HTMLDivElement;
   let left = $state(ui.contextMenu?.x ?? 0);

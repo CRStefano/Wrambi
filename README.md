@@ -61,17 +61,25 @@ It is free, it is MIT licensed, and it will stay that way.
 
 **Citations from Zotero.** Point Wrambi at a `.bib` or CSL JSON file. Press `Ctrl+Shift+C`, type a name, pick the work, add a page. Citations and the reference list come out right in every format, and they are native citations in LaTeX and Typst. If Zotero keeps the file updated, Wrambi picks up the changes.
 
+**PDFs you can read three ways.** The extracted text, the original pages, or both side by side, scrolling together. Switch views and you stay on the same sentence. Select text right on the page to highlight it or to attach a note, and that note shows up in every view.
+
 **A PDF editor that keeps the layout.** Click a line and rewrite it. Add text, highlight, cover, drop in an image. Rotate, reorder, delete and merge pages. Undo everything.
 
 **A library of your own files.** Real page previews of your PDFs, EPUB covers, folders, and reading states: unread, reading, read.
+
+**A live preview that follows you.** HTML or a typeset PDF next to your text, like in Typst: it scrolls with you, and a click on a page takes the text there.
 
 **Export without installing anything.** PDF (the [Typst](https://typst.app) typesetter is built in), EPUB, HTML, LaTeX, Typst, Markdown and plain text.
 
 **An encrypted vault.** One file, one password, to carry your notes, settings, drafts and documents to another computer with no cloud in between.
 
-**Everywhere you write.** Windows, macOS and Linux, in English, Italian and French.
+**Everywhere you write.** Windows, macOS and Linux, in English, Italian and French. The first time, a short guided tour shows you around; it stays in the menu.
 
 ## A short tour
+
+![A PDF read side by side: the extracted text on the left, the original page on the right, with a highlight and a note on both](docs/screenshots/split.png)
+
+<p align="center"><sub><b>Text and pages, side by side and in step.</b> A highlight and a note made on the page also live in the text, and the other way round.</sub></p>
 
 <table>
   <tr>
@@ -92,11 +100,11 @@ It is free, it is MIT licensed, and it will stay that way.
   </tr>
   <tr>
     <td><img src="docs/screenshots/dark-preview.png" alt="Dark theme with the live preview showing notes and references" /></td>
-    <td><img src="docs/screenshots/settings.png" alt="Settings: language, theme and fonts" /></td>
+    <td><img src="docs/screenshots/tour.png" alt="The guided tour explaining how Wrambi reads PDFs" /></td>
   </tr>
   <tr>
     <td><sub><b>Live preview.</b> Your notes and the reference list, already formatted. One click switches to PDF, Typst, LaTeX or text.</sub></td>
-    <td><sub><b>Make it yours.</b> Interface and document language, themes, the sharpest screen fonts of your system or five bundled ones.</sub></td>
+    <td><sub><b>A tour that explains the why.</b> Each step says what a part is for, how to use it and how Wrambi does it.</sub></td>
   </tr>
 </table>
 
@@ -118,7 +126,7 @@ I'd rather you know this before you install it.
 
 - **It is not a cloud service.** There is no account, no sync server, no analytics, and the app does not even check for updates. Wrambi makes no network requests of its own. The only exceptions: web images you link in a document load in the preview, and on Windows the installer downloads Microsoft's WebView2 if the system lacks it.
 - **It is not Word.** The Markdown marks stay visible, dimmed, as in iA Writer. If you need tracked changes with a co-author, Word is the right tool.
-- **It is not Acrobat.** A PDF has no paragraphs, only lines placed on a page, so a rewritten line does not push the following ones down, and the new text uses the closest standard font, not the original one. Replaced or covered text is hidden, not deleted: it is still inside the file, so covering is not a way to remove confidential data.
+- **It is not Acrobat.** A PDF has no paragraphs, only lines placed on a page, so a rewritten line does not push the following ones down, and the new text uses the closest standard font, not the original one. Replaced or covered text is hidden, not deleted: it is still inside the file, so covering is not a way to remove confidential data. Wrambi's own notes and highlights are not written into the PDF; the editor's *Highlight* tool is the one that is.
 - **It is not a reference manager.** Zotero is very good at that. Wrambi reads what Zotero exports and formats it author-year (Chicago style) in HTML, EPUB and text. In PDF and LaTeX, Typst and biblatex apply their own author-year styles.
 - **It does not read scans.** A scanned PDF has no text, and there is no OCR.
 - **It opens one document at a time.** No tabs. That is mostly on purpose.
@@ -144,6 +152,7 @@ The full list of limitations is in the [Italian documentation](README.it.md).
 
 **Notes**
 - Notes on every format. The anchor (the quoted words plus some context) survives edits made inside or outside Wrambi. A note whose text can no longer be found is flagged, never silently dropped.
+- Highlights (`Ctrl+Shift+H`): a yellow mark with an optional comment, listed with the notes and exported with them, but never turned into footnotes.
 - Export the notes of one document, or all of them, to Markdown, plain text, LaTeX, Typst or PDF, each with its passage.
 - Notes as footnotes: `\footnote` in LaTeX, `#footnote` in Typst and PDF, endnotes in HTML and EPUB, `[^1]` in Markdown.
 - Delete a note from its card, from the Notes view, or by right-clicking the red text. Every deletion can be undone.
@@ -151,7 +160,8 @@ The full list of limitations is in the [Italian documentation](README.it.md).
 **Library and reading**
 - Sections for all documents, recent ones, drafts and edits, notes, the three reading states, and the folder tree. Grid or list, sorting, search.
 - Rename a file with `F2`: its notes, reading state and history follow it.
-- PDF: original pages (pdf.js), or the extracted text rebuilt as Markdown (headings, lists, paragraphs, rejoined hyphenated words).
+- PDF: the extracted text rebuilt as Markdown (headings, lists, paragraphs, rejoined hyphenated words), the original pages (pdf.js), or both side by side, scrolling together. Switching views keeps your place.
+- Highlights and notes can be made on the text or directly on the pages, and in the PDF editor with the *Note* tool. Editing the text of a PDF keeps its pages at hand, and notes stay linked to the original.
 - EPUB and HTML: readable text with headings, emphasis, lists and quotes.
 
 **PDF editing**
@@ -173,7 +183,7 @@ On a Mac, `Ctrl` is `⌘`.
 | Keys | Action |
 | --- | --- |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` | New, open, save |
-| `Ctrl+M` | Note on the selected text |
+| `Ctrl+M` / `Ctrl+Shift+H` | Note on the selected text, highlight it |
 | `Ctrl+Shift+C` | Cite a work from the bibliography |
 | `Ctrl+Shift+L` / `Ctrl+Shift+N` / `Ctrl+Shift+P` | Library, notes, preview |
 | `Ctrl+Shift+E` | Export |
@@ -186,7 +196,7 @@ On a Mac, `Ctrl` is `⌘`.
 
 ## How it is built
 
-Wrambi is about 20,000 lines of TypeScript, Svelte and Rust. The shell is [Tauri 2](https://tauri.app), so Wrambi uses the web view your system already has instead of shipping its own copy of Chrome. The whole app, a complete typesetting engine included, comes in an installer of around 20 MB.
+Wrambi is about 22,000 lines of TypeScript, Svelte and Rust. The shell is [Tauri 2](https://tauri.app), so Wrambi uses the web view your system already has instead of shipping its own copy of Chrome. The whole app, a complete typesetting engine included, comes in an installer of around 20 MB.
 
 | Part | Technology |
 | --- | --- |
@@ -200,7 +210,7 @@ Wrambi is about 20,000 lines of TypeScript, Svelte and Rust. The shell is [Tauri
 | EPUB | its own reader and writer, [fflate](https://github.com/101arrowz/fflate) for the zip |
 | Vault | XChaCha20-Poly1305 and Argon2id ([RustCrypto](https://github.com/RustCrypto)) |
 
-Every change to `main` and every pull request runs the type checker and 74 interface tests, then 29 Rust tests and clippy on Windows, macOS and Linux. Pushing a `v*` tag builds the installers for all three systems on GitHub's machines. I don't own a Mac: GitHub builds the macOS app.
+Every change to `main` and every pull request runs the type checker and 83 interface tests, then 29 Rust tests and clippy on Windows, macOS and Linux. Pushing a `v*` tag builds the installers for all three systems on GitHub's machines. I don't own a Mac: GitHub builds the macOS app.
 
 ```
 src/                  interface (Svelte + TypeScript)
@@ -212,7 +222,7 @@ src/                  interface (Svelte + TypeScript)
   lib/editor/         CodeMirror setup, formatting, notes, citations
   lib/i18n/           interface languages
   lib/pdfedit/        PDF editing model
-  lib/reader/         PDF reading and text reconstruction
+  lib/reader/         PDF reading, text reconstruction, text–page sync, notes on pages
 src-tauri/src/        Rust core: files, library scan, Typst, vault, window
 tests/                interface tests and sample files
 ```

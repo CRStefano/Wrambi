@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import type { PDFDocumentProxy } from 'pdfjs-dist';
   import { Copy, FileOutput, X } from 'lucide';
   import Icon from './Icon.svelte';
@@ -10,7 +10,9 @@
   import { bibFileFor } from '../lib/convert/emit';
   import { conversionInput, exportableNotes, isConvertible, suggestedName, VIRTUAL_BIB } from '../lib/exporter';
   import { editor } from '../lib/editor/controller';
-  import { closePdfDocument, openPdf } from '../lib/reader/pdf';
+  import { buildPdfIndex, closePdfDocument, openPdf } from '../lib/reader/pdf';
+  import { lowerBound, matchAt, normalize, pageToText, textToPage, type PagePoint, type PdfIndex } from '../lib/reader/textmap';
+  import { editorNorm } from '../lib/reader/sync.svelte';
   import { doc, notify, save, settings, ui, type PreviewFormat } from '../lib/state.svelte';
   import { actions } from '../lib/actions';
   import { exportState } from '../lib/exportState.svelte';
@@ -54,7 +56,12 @@
         else {
           const { text, opts } = await conversionInput();
           const r = await converter.preview(text, 'html-fragment', opts);
-          if (r != null) html = r.text;
+          if (r != null && r.text !== html) {
+            html = r.text;
+            htmlMap = null;
+            await tick();
+            scheduleFollow();
+          }
         }
       } else if (fmt === 'pdf') {
         await refreshPdf();
@@ -96,6 +103,8 @@
         pdf = next;
         pdfVersion++;
         closePdfDocument(old);
+        // Il documento nuovo ha le stesse pagine più o meno nello stesso posto: si riallinea al testo.
+        setTimeout(scheduleFollow, 60);
       }
       ms = Math.round(performance.now() - t0);
     } catch (e) {
@@ -115,12 +124,94 @@
     timer = setTimeout(refresh, fmt === 'pdf' ? 550 : 90);
   }
 
+  /* ───────────── L'anteprima segue il testo (come in Typst) ───────────── */
+
+  let pages: PdfPages | undefined = $state();
+  /** Testo delle pagine del PDF dell'anteprima, costruito quando serve. */
+  let pdfIndex: { pdf: PDFDocumentProxy; index: PdfIndex | null; building: Promise<PdfIndex | null> } | null = null;
+
+  async function indexOf(doc: PDFDocumentProxy): Promise<PdfIndex | null> {
+    if (pdfIndex?.pdf === doc) return pdfIndex.index ?? pdfIndex.building;
+    const building = buildPdfIndex(doc, () => pdf === doc);
+    pdfIndex = { pdf: doc, index: null, building };
+    const idx = await building;
+    if (pdfIndex?.pdf === doc) pdfIndex.index = idx;
+    return idx;
+  }
+
+  /** Testo ridotto dell'anteprima HTML, con il nodo di ogni carattere. */
+  let htmlMap: { text: string; nodes: Text[]; offsets: number[] } | null = null;
+
+  function htmlIndex() {
+    if (htmlMap || !body) return htmlMap;
+    const article = body.querySelector('.doc-preview') ?? body;
+    const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
+    const parts: string[] = [];
+    const nodes: Text[] = [];
+    const offsets: number[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      const n = normalize((node as Text).data);
+      parts.push(n.text);
+      for (let i = 0; i < n.text.length; i++) {
+        nodes.push(node as Text);
+        offsets.push(n.map[i]);
+      }
+    }
+    htmlMap = { text: parts.join(''), nodes, offsets };
+    return htmlMap;
+  }
+
+  let following = 0;
+
+  /** Porta l'anteprima al punto del testo che si sta leggendo o scrivendo. */
+  async function follow() {
+    if (!ui.preview || !body) return;
+    const pos = editor.topPosition();
+    const ed = editorNorm();
+    if (fmt === 'pdf') {
+      const doc = pdf;
+      if (!doc || !pages) return;
+      const idx = await indexOf(doc);
+      if (!idx || doc !== pdf) return;
+      const pt = textToPage(ed, pos, idx);
+      if (pt) pages.scrollToPoint(pt);
+    } else if (fmt === 'html' && !(doc.mode === 'edit' && doc.format === 'html')) {
+      const map = htmlIndex();
+      if (!map?.text.length) return;
+      const k = Math.min(lowerBound(ed.map, pos), ed.text.length - 1);
+      const at = matchAt(ed.text, k, map.text, (k / Math.max(1, ed.text.length)) * map.text.length);
+      if (at == null) return;
+      const range = document.createRange();
+      range.setStart(map.nodes[at], map.offsets[at]);
+      const r = range.getBoundingClientRect();
+      const box = body.getBoundingClientRect();
+      body.scrollTop += r.top - box.top - 40;
+    }
+  }
+
+  function scheduleFollow() {
+    cancelAnimationFrame(following);
+    following = requestAnimationFrame(() => void follow());
+  }
+
+  /** Clic su una pagina dell'anteprima: il testo va a quel punto. */
+  async function jumpToText(pt: PagePoint) {
+    if (!pdf) return;
+    const idx = await indexOf(pdf);
+    if (!idx) return;
+    const pos = pageToText(idx, pt, editorNorm());
+    if (pos != null) editor.scrollToPosition(pos);
+  }
+
   onMount(() => {
     const offChange = editor.onChange(() => {
       if (ui.preview) schedule();
     });
     const offScroll = editor.onScroll((ratio) => {
-      if (body && fmt !== 'pdf') body.scrollTop = ratio * (body.scrollHeight - body.clientHeight);
+      if (!body) return;
+      if (fmt === 'pdf' || (fmt === 'html' && !(doc.mode === 'edit' && doc.format === 'html'))) scheduleFollow();
+      else body.scrollTop = ratio * (body.scrollHeight - body.clientHeight);
     });
     return () => {
       offChange();
@@ -254,9 +345,7 @@
         {/if}
       {:else if fmt === 'pdf'}
         {#if pdf}
-          {#key pdfVersion}
-            <PdfPages {pdf} docKey={'preview-' + pdfVersion} maxWidth={760} />
-          {/key}
+          <PdfPages bind:this={pages} {pdf} docKey={'preview:' + doc.key} maxWidth={760} onpointclick={(pt) => void jumpToText(pt)} />
         {:else if !errors.length}
           <p class="faint pad">{t('Compilazione del PDF…')}</p>
         {/if}

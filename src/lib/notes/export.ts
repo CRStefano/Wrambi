@@ -66,7 +66,9 @@ export function notesMarkdown(notes: Note[], title: string, now = new Date()): s
     if (multi) out.push(`## ${mdEscape(displayName(list[0].docName))}`);
     for (const n of [...list].sort((a, b) => a.from - b.from)) {
       if (n.quote.trim()) out.push(quote(n.quote));
-      out.push(n.text.trim() ? mdEscape(n.text) : `*${t('(nota vuota)')}*`);
+      // Un'evidenziazione senza commento è solo il passo; con un commento lo dice.
+      if (n.kind === 'highlight') out.push(n.text.trim() ? `*${t('Evidenziato')}:* ${mdEscape(n.text)}` : `*${t('Evidenziato')}*`);
+      else out.push(n.text.trim() ? mdEscape(n.text) : `*${t('(nota vuota)')}*`);
       if (n.orphan) out.push(`*${t('Il passo annotato non è più nel documento.')}*`);
     }
   }

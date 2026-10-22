@@ -22,8 +22,71 @@
     type TextLine,
   } from '../../lib/pdfedit/model';
   import { addOp, checkpoint, images, newId, pdfEdit, removeOp, sourcePdf, updateOp } from '../../lib/pdfedit/session.svelte';
+  import { annotateSelection, type PageMark } from '../../lib/reader/sync.svelte';
+  import { confirmSpan, renderTextLayer, selectionPoint, textRects, type RenderedText } from '../../lib/reader/textlayer';
+  import { popoverPlacement } from '../../lib/actions';
+  import { editorNoteMenu } from '../../lib/notes/manage';
+  import { ui } from '../../lib/state.svelte';
 
-  let { ref, width, number }: { ref: PageRef; width: number; number: number } = $props();
+  let { ref, width, number, marks = [] }: { ref: PageRef; width: number; number: number; marks?: PageMark[] } = $props();
+
+  /* ───────────── Note di Wrambi sulla pagina (testo selezionabile con lo strumento Nota) ───────────── */
+
+  let layerEl: HTMLDivElement | undefined = $state();
+  let layer: RenderedText | null = null;
+  let layerKey = '';
+  let markRects = $state<{ id: string; kind: string; n?: number; boxes: DOMRect[] }[]>([]);
+
+  async function drawLayer() {
+    if (!page || ref.src !== 0 || !layerEl) return;
+    const key = `${view.scale}:${rotation}`;
+    if (key === layerKey) return;
+    layerKey = key;
+    layer = await renderTextLayer(page, layerEl, view.scale, ref.rotate);
+    placeMarks();
+  }
+
+  function placeMarks() {
+    if (!layer || !host) {
+      markRects = [];
+      return;
+    }
+    const origin = host.getBoundingClientRect();
+    const out: typeof markRects = [];
+    for (const m of marks) {
+      const span = confirmSpan(layer.text, m.quote, m.from, m.to);
+      if (!span) continue;
+      const boxes = textRects(layer, span[0], span[1], origin);
+      if (boxes.length) out.push({ id: m.id, kind: m.kind, n: m.n, boxes });
+    }
+    markRects = out;
+  }
+
+  $effect(() => {
+    void marks;
+    placeMarks();
+  });
+
+  /** Fine di una selezione con lo strumento Nota: si apre il riquadro della nota. */
+  function noteFromSelection() {
+    const sel = window.getSelection();
+    if (!layer || !layerEl || !sel || sel.isCollapsed || !sel.rangeCount) return false;
+    const range = sel.getRangeAt(0);
+    if (!layerEl.contains(range.startContainer) || !layerEl.contains(range.endContainer)) return false;
+    const a = selectionPoint(layer, layerEl, range.startContainer, range.startOffset, 'start');
+    const b = selectionPoint(layer, layerEl, range.endContainer, range.endOffset, 'end');
+    if (a == null || b == null || b <= a) return false;
+    annotateSelection('note', { startPage: ref.index, startAt: a, endPage: ref.index, endAt: b, rect: range.getBoundingClientRect() });
+    return true;
+  }
+
+  function markAt(e: MouseEvent) {
+    const r = host.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    for (const m of markRects) for (const b of m.boxes) if (x >= b.left - 2 && x <= b.right + 2 && y >= b.top - 2 && y <= b.bottom + 3) return { m, rect: new DOMRect(r.left + b.left, r.top + b.top, b.width, b.height) };
+    return null;
+  }
 
   let canvas: HTMLCanvasElement;
   let host: HTMLDivElement;
@@ -97,6 +160,7 @@
       () => {
         rendered = key;
         void loadLines();
+        void drawLayer();
       },
       () => {},
     );
@@ -266,6 +330,11 @@
     if (ev.button !== 0) return;
     const target = ev.target as HTMLElement;
     if (target.closest('input, .op-tools')) return;
+    // Strumento Nota: si seleziona il testo come in un lettore (niente modifiche alla pagina).
+    if (pdfEdit.tool === 'note') {
+      if (editing) void commit();
+      return;
+    }
     if (editing) {
       void commit();
       return;
@@ -339,6 +408,15 @@
   }
 
   function onPointerUp(ev: PointerEvent) {
+    if (pdfEdit.tool === 'note') {
+      if (ev.button !== 0) return;
+      setTimeout(() => {
+        if (noteFromSelection()) return;
+        const hit = markAt(ev);
+        if (hit) ui.popover = { noteId: hit.m.id, ...popoverPlacement(hit.rect) };
+      }, 0);
+      return;
+    }
     if (moving) {
       moving = null;
       host.releasePointerCapture(ev.pointerId);
@@ -441,8 +519,32 @@
   onpointermove={onPointerMove}
   onpointerup={onPointerUp}
   ondblclick={onDblClick}
+  oncontextmenu={(e) => {
+    const hit = pdfEdit.tool === 'note' ? markAt(e) : null;
+    if (hit) {
+      e.preventDefault();
+      editorNoteMenu(hit.m.id, e.clientX, e.clientY, hit.rect);
+    }
+  }}
 >
   <canvas bind:this={canvas} style="width:{view.width}px;height:{view.height}px" aria-label={t('Pagina {n}', { n: number })}></canvas>
+
+  {#if markRects.length}
+    <div class="pdf-marks" aria-hidden="true">
+      {#each markRects as m (m.id)}
+        {#each m.boxes as b, j (j)}
+          <span class="pdf-mark {m.kind}" style="left:{b.left}px;top:{b.top}px;width:{b.width}px;height:{b.height}px"></span>
+        {/each}
+        {#if m.n}
+          {@const last = m.boxes[m.boxes.length - 1]}
+          <sup class="pdf-mark-num" style="left:{last.right + 1}px;top:{last.top - 4}px">{m.n}</sup>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+  {#if ref.src === 0}
+    <div class="textLayer" class:live={pdfEdit.tool === 'note'} bind:this={layerEl}></div>
+  {/if}
 
   {#if showLines}
     <div class="lines" aria-hidden="true">
@@ -517,6 +619,20 @@
   }
   canvas {
     display: block;
+  }
+  /* Il testo si seleziona solo con lo strumento Nota. */
+  .page :global(.textLayer) {
+    pointer-events: none;
+  }
+  .page :global(.textLayer.live) {
+    pointer-events: auto;
+  }
+  .page :global(.textLayer:not(.live) span) {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .tool-note .op {
+    pointer-events: none;
   }
   .lines,
   .ops {

@@ -2,7 +2,8 @@
  * Comandi dell'app, condivisi da barra, menu e scorciatoie.
  */
 import { inTauri } from './backend';
-import { newDraft, openWithDialog, saveNow, startEditing, writeDerived } from './docs.svelte';
+import { createNote, newDraft, openWithDialog, saveNow, startEditing, writeDerived } from './docs.svelte';
+import { annotateSelection, pageSelection, pagesAvailable } from './reader/sync.svelte';
 import { editor } from './editor/controller';
 import { pdfEdit, startPdfEdit } from './pdfedit/session.svelte';
 import { IS_MAC } from './platform';
@@ -116,13 +117,14 @@ export const actions = {
     save.settings();
   },
   startNote() {
-    const sel = editor.selectionForNote();
-    if (!sel) {
-      notify(t('Seleziona il testo a cui collegare la nota.'), 'info');
+    // Testo selezionato sulle pagine del PDF.
+    if (pageSelection.sel && pagesAvailable() && doc.pdfView !== 'text') {
+      annotateSelection('note');
       return;
     }
-    if (doc.mode === 'read' && doc.pdfView === 'pages') {
-      notify(t('Le note si aggiungono nella vista Testo.'), 'info');
+    const sel = doc.pdfView === 'pages' && pagesAvailable() ? null : editor.selectionForNote();
+    if (!sel) {
+      notify(t('Seleziona il testo a cui collegare la nota.'), 'info');
       return;
     }
     const v = editor.view!;
@@ -130,6 +132,19 @@ export const actions = {
     const end = v.coordsAtPos(sel.to) ?? start;
     if (!start || !end) return;
     ui.popover = { noteId: null, draft: sel, ...popoverPlacement(new DOMRect(start.left, start.top, end.right - start.left, end.bottom - start.top)) };
+  },
+  /** Evidenzia il testo selezionato (nel testo o sulle pagine del PDF). */
+  highlight() {
+    if (pageSelection.sel && pagesAvailable() && doc.pdfView !== 'text') {
+      annotateSelection('highlight');
+      return;
+    }
+    const sel = doc.pdfView === 'pages' && pagesAvailable() ? null : editor.selectionForNote();
+    if (!sel) {
+      notify(t('Seleziona il testo da evidenziare.'), 'info');
+      return;
+    }
+    createNote(sel, '', 'highlight');
   },
   /** Modifica le pagine del PDF aperto (testo, evidenziazioni, pagine). */
   editPdf: async () => {
@@ -201,6 +216,7 @@ export const SHORTCUTS: Shortcut[] = [
   { group: tk('Testo'), keys: 'Ctrl+E', label: tk('Codice nel testo') },
   { group: tk('Testo'), keys: 'Ctrl+K', label: tk('Collegamento') },
   { group: tk('Testo'), keys: 'Ctrl+M', label: tk('Nota sul testo selezionato') },
+  { group: tk('Testo'), keys: 'Ctrl+Shift+H', label: tk('Evidenzia il testo selezionato') },
   { group: tk('Testo'), keys: 'Ctrl+Shift+C', label: tk('Cita un\'opera della bibliografia') },
   { group: tk('Vista'), keys: IS_MAC ? '⌃+⌘+F' : 'F11', label: tk('Schermo intero (Esc per uscire)') },
   { group: tk('Vista'), keys: 'Ctrl+Shift+F', label: tk('Focus') },
@@ -216,6 +232,8 @@ export const SHORTCUTS: Shortcut[] = [
 
 /** Scorciatoie globali, intercettate prima dell'editor. */
 export function handleGlobalKey(e: KeyboardEvent): boolean {
+  // Durante il giro di Wrambi i tasti li gestisce il giro.
+  if (ui.tour != null) return false;
   const mod = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
   // Durante la modifica di un PDF salva, annulla e ripeti sono della modifica.
@@ -273,6 +291,9 @@ export function handleGlobalKey(e: KeyboardEvent): boolean {
         return run(() => actions.toggleFocus());
       case 'd':
         return run(actions.toggleDnd);
+      case 'h':
+        if (ui.home) return false;
+        return run(actions.highlight);
     }
     return false;
   }

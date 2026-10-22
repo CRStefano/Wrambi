@@ -23,7 +23,8 @@ export function isConvertible(): boolean {
 /** Note del documento aperto che si possono esportare come note a piè di pagina. */
 export function exportableNotes() {
   if (!doc.key) return [];
-  return notesFor(doc.key).filter((n) => !n.orphan && n.text.trim());
+  // Le evidenziazioni non diventano note a piè di pagina.
+  return notesFor(doc.key).filter((n) => !n.orphan && n.text.trim() && n.kind !== 'highlight');
 }
 
 /** Testo da convertire e opzioni comuni: lingua, note di Wrambi, citazioni. */

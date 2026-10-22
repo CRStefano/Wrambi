@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { CopyPlus, FileOutput, FilePlus, FolderOpen, Keyboard, KeyRound, Save, Search, Settings, SquarePen } from 'lucide';
+  import { Compass, CopyPlus, FileOutput, FilePlus, FolderOpen, Keyboard, KeyRound, Save, Search, Settings, SquarePen } from 'lucide';
+  import { startTour } from '../lib/tour';
   import Icon from './Icon.svelte';
   import { actions } from '../lib/actions';
   import { doc, ui } from '../lib/state.svelte';
@@ -21,6 +22,7 @@
     'sep',
     { label: tk('Impostazioni'), keys: 'Ctrl+,', icon: Settings, run: actions.openSettings },
     { label: tk('Scorciatoie da tastiera'), keys: 'Ctrl+/', icon: Keyboard, run: actions.openShortcuts },
+    { label: tk('Tour di Wrambi'), icon: Compass, run: startTour },
   ]);
 
   function pick(fn: () => void) {

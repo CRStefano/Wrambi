@@ -95,6 +95,8 @@ export const MEASURES: Record<Measure, string> = { narrow: '58ch', medium: '68ch
 export interface Settings {
   version: 2;
   firstRunDone: boolean;
+  /** Il giro di Wrambi è già stato proposto (si riapre dal menu). */
+  tourSeen?: boolean;
   libraryRoot: string | null;
   theme: ThemeChoice;
   font: FontId;
@@ -168,6 +170,14 @@ export interface Note {
   updated: number;
   /** Il testo annotato non è stato ritrovato nel documento. */
   orphan?: boolean;
+  /** Evidenziazione: segno giallo senza numero; il commento è facoltativo. */
+  kind?: 'highlight';
+  /**
+   * Ancoraggio nel testo originale di un PDF, EPUB o HTML. Resta quello di
+   * quando la nota è stata scritta anche se poi si modifica il testo, così la
+   * nota si ritrova riaprendo il documento originale.
+   */
+  src?: { quote: string; prefix: string; suffix: string };
 }
 
 export interface DocRef {
@@ -247,7 +257,7 @@ export interface OpenDoc {
   words: number;
   chars: number;
   /** PDF: vista pagine o testo. */
-  pdfView: 'pages' | 'text';
+  pdfView: 'pages' | 'text' | 'split';
   pdfPages: number;
   derived: DerivedEdit | null;
 }
@@ -278,7 +288,7 @@ export const doc = $state<OpenDoc>({
 export interface MenuItem {
   label: string;
   run: () => unknown;
-  icon?: 'open' | 'edit' | 'delete' | 'export';
+  icon?: 'open' | 'edit' | 'delete' | 'export' | 'note' | 'highlight';
   danger?: boolean;
   separatorBefore?: boolean;
 }
@@ -309,6 +319,8 @@ export const ui = $state({
   fullscreen: false,
   dnd: false,
   firstRun: false,
+  /** Passo del giro di Wrambi in corso (null: nessun giro). */
+  tour: null as number | null,
   link: null as null | { text: string; href: string; from: number; to: number },
   /** Finestra per inserire una citazione. */
   cite: false,

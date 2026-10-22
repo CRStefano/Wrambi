@@ -1,0 +1,9 @@
+# Testo normalizzato nel repository; gli script di Windows restano con CRLF.
+* text=auto
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.epub binary

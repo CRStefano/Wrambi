@@ -4,7 +4,9 @@
 import { popoverPlacement } from '../actions';
 import { openNoteContext } from '../docs.svelte';
 import { editor } from '../editor/controller';
-import { ui, type Note } from '../state.svelte';
+import { doc, ui, type Note } from '../state.svelte';
+import { pagesAvailable, revealNoteOnPages } from '../reader/sync.svelte';
+import { tick } from 'svelte';
 
 export async function goToNote(n: Note): Promise<boolean> {
   const ok = await openNoteContext(n);
@@ -13,6 +15,17 @@ export async function goToNote(n: Note): Promise<boolean> {
   if (n.orphan) {
     ui.popover = { noteId: n.id, x: window.innerWidth / 2 - 180, y: 120, below: true };
     return true;
+  }
+  if (doc.pdfView === 'pages' && pagesAvailable()) {
+    // Vista a pagine: la nota si mostra sulla pagina.
+    await tick();
+    if (revealNoteOnPages(n.id)) {
+      setTimeout(() => {
+        const el = document.querySelector<HTMLElement>(`.pdf-page .pdf-mark[data-id="${CSS.escape(n.id)}"]`);
+        if (el) ui.popover = { noteId: n.id, ...popoverPlacement(el.getBoundingClientRect()) };
+      }, 650);
+      return true;
+    }
   }
   requestAnimationFrame(() => {
     editor.view?.requestMeasure();

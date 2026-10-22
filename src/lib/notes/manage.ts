@@ -4,11 +4,11 @@
  */
 import { popoverPlacement } from '../actions';
 import { backend, dialogs, joinPath } from '../backend';
-import { deleteNotes, displayName } from '../docs.svelte';
+import { deleteNotes, displayName, setNoteKind } from '../docs.svelte';
 import { editor } from '../editor/controller';
 import { goToNote } from './go';
 import { t, tn } from '../i18n';
-import { session, settings, ui, type MenuItem, type Note } from '../state.svelte';
+import { notesStore, session, settings, ui, type MenuItem, type Note } from '../state.svelte';
 
 /** Percorso del documento di una nota, se è un file. */
 export function notePath(n: Pick<Note, 'docKey' | 'docPath'>): string | null {
@@ -41,17 +41,26 @@ export function noteMenu(e: MouseEvent, n: Note) {
   ]);
 }
 
-/** Menu del tasto destro sul testo rosso nell'editor. */
-export function editorNoteMenu(id: string, x: number, y: number) {
+/**
+ * Menu del tasto destro su una nota o un'evidenziazione nel testo (o sulle
+ * pagine del PDF: allora `at` è il rettangolo del segno sulla pagina).
+ */
+export function editorNoteMenu(id: string, x: number, y: number, at?: DOMRect) {
+  const open = () => {
+    const rect = at ?? editor.revealNote(id);
+    if (rect) ui.popover = { noteId: id, ...popoverPlacement(rect) };
+  };
+  const n = notesStore.list.find((x) => x.id === id);
+  if (n?.kind === 'highlight') {
+    openMenuAt(x, y, [
+      { label: n.text ? t('Modifica il commento') : t('Aggiungi un commento'), icon: 'edit', run: open },
+      { label: t('Trasforma in nota'), icon: 'note', run: () => setNoteKind(id, 'note') },
+      { label: t('Elimina l\'evidenziazione'), icon: 'delete', danger: true, separatorBefore: true, run: () => deleteNotes([id]) },
+    ]);
+    return;
+  }
   openMenuAt(x, y, [
-    {
-      label: t('Modifica la nota'),
-      icon: 'edit',
-      run: () => {
-        const rect = editor.revealNote(id);
-        if (rect) ui.popover = { noteId: id, ...popoverPlacement(rect) };
-      },
-    },
+    { label: t('Modifica la nota'), icon: 'edit', run: open },
     { label: t('Elimina la nota'), icon: 'delete', danger: true, separatorBefore: true, run: () => deleteNotes([id]) },
   ]);
 }

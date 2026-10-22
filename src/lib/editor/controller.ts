@@ -91,6 +91,9 @@ class Controller {
   private changeListeners: Listener<void>[] = [];
   private selectionListeners: Listener<ActiveFormat & { empty: boolean }>[] = [];
   private scrollListeners: Listener<number>[] = [];
+  private loadListeners: Listener<void>[] = [];
+  /** Cresce a ogni modifica o caricamento del testo (per le cache di chi lo legge). */
+  version = 0;
   private lang: EditorLanguage = 'md';
   private caretStyle: CaretStyle = 'system';
   onLinkRequest: ((link: { text: string; href: string; from: number; to: number }) => void) | null = null;
@@ -211,7 +214,10 @@ class Controller {
         editorTheme,
         EditorState.allowMultipleSelections.of(false),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) for (const l of this.changeListeners) l();
+          if (u.docChanged) {
+            this.version++;
+            for (const l of this.changeListeners) l();
+          }
           if (u.selectionSet || u.docChanged) {
             const info = { ...activeFormat(u.state), empty: u.state.selection.main.empty };
             for (const l of this.selectionListeners) l(info);
@@ -240,6 +246,14 @@ class Controller {
     this.view.dispatch({
       effects: [spell.reconfigure(this.spellExt(opts.spellcheck && !ro)), typing.reconfigure(opts.typewriter && !ro ? typewriter : [])],
     });
+    this.version++;
+    for (const l of this.loadListeners) l();
+  }
+
+  /** Un documento nuovo è stato caricato nell'editor. */
+  onLoad(l: Listener<void>): () => void {
+    this.loadListeners.push(l);
+    return () => (this.loadListeners = this.loadListeners.filter((x) => x !== l));
   }
 
   /**
@@ -385,6 +399,20 @@ class Controller {
     const to = sel.to - trail;
     if (to <= from) return null;
     return { from, to, quote: this.view.state.sliceDoc(from, to) };
+  }
+
+  /** Rettangolo sullo schermo della selezione (null se vuota o fuori vista). */
+  selectionRect(): DOMRect | null {
+    const v = this.view;
+    if (!v) return null;
+    const sel = v.state.selection.main;
+    if (sel.empty) return null;
+    const a = v.coordsAtPos(sel.from);
+    const b = v.coordsAtPos(sel.to);
+    if (!a || !b) return null;
+    const left = Math.min(a.left, b.left);
+    const right = Math.max(a.right, b.right);
+    return new DOMRect(left, a.top, Math.max(1, right - left), b.bottom - a.top);
   }
 
   addNoteRange(n: NoteRange) {

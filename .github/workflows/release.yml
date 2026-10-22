@@ -1,0 +1,75 @@
+name: Release
+
+# Pushing a tag such as v0.2.0 builds Wrambi for Windows, macOS and Linux and
+# attaches the installers to a draft release, to be reviewed and published by hand.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows installer
+            os: windows-latest
+            args: --bundles nsis
+          - name: macOS app (Apple silicon and Intel)
+            os: macos-latest
+            args: --target universal-apple-darwin --bundles app,dmg
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - name: Linux packages
+            os: ubuntu-22.04
+            args: --bundles deb,appimage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Interface tests
+        run: npm test
+
+      - name: Build and upload
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_name }}
+          releaseName: Wrambi ${{ github.ref_name }}
+          releaseBody: |
+            Wrambi ${{ github.ref_name }} for Windows, macOS and Linux. See CHANGELOG.md for what changed.
+
+            The installers are not signed with a paid certificate yet:
+            - **Windows**: SmartScreen asks for confirmation the first time ("More info" → "Run anyway").
+            - **macOS**: the app is signed ad hoc, not notarized. The first time, right-click Wrambi in Applications → Open → Open. If macOS says the app is damaged, run `xattr -cr /Applications/Wrambi.app` in Terminal.
+            - **Linux**: install the `.deb` (Debian, Ubuntu, Mint) or make the `.AppImage` executable and run it.
+          releaseDraft: true
+          prerelease: false

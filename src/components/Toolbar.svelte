@@ -4,6 +4,7 @@
     BookOpen,
     ChevronDown,
     Code,
+    Columns2,
     FileText,
     Italic,
     Link,
@@ -25,6 +26,14 @@
   import { keys, t, tk } from '../lib/i18n';
   import { pdfEdit } from '../lib/pdfedit/session.svelte';
   import { READ_LABELS, doc, readState, setReadState, ui, type ReadState } from '../lib/state.svelte';
+  import { pageSelection, pagesAvailable, setPdfView, type PdfView } from '../lib/reader/sync.svelte';
+
+  const VIEWS: { id: PdfView; label: string; tip: string; icon: typeof FileText }[] = [
+    { id: 'text', label: tk('Testo'), tip: tk('Il testo del PDF: si legge, si annota e si cerca'), icon: FileText },
+    { id: 'pages', label: tk('Pagine'), tip: tk('Le pagine originali del PDF: anche qui si evidenzia e si annota'), icon: BookOpen },
+    { id: 'split', label: tk('Affiancate'), tip: tk('Testo e pagine affiancati, che scorrono insieme'), icon: Columns2 },
+  ];
+  const canNote = $derived((!ui.selectionEmpty && doc.pdfView !== 'pages') || !!pageSelection.sel);
 
   const BLOCKS: { id: BlockKind; label: string; keys: string }[] = [
     { id: 'p', label: tk('Paragrafo'), keys: 'Ctrl+0' },
@@ -78,13 +87,12 @@
 {:else if doc.mode === 'read'}
   <div class="bar reading" role="toolbar" aria-label={t('Lettura')}>
     {#if doc.readKind === 'pdf'}
-      <div class="seg" role="radiogroup" aria-label={t('Vista del PDF')}>
-        <button role="radio" aria-checked={doc.pdfView === 'text'} class:on={doc.pdfView === 'text'} onclick={() => (doc.pdfView = 'text')}>
-          <Icon icon={FileText} size={15} /> {t('Testo')}
-        </button>
-        <button role="radio" aria-checked={doc.pdfView === 'pages'} class:on={doc.pdfView === 'pages'} onclick={() => (doc.pdfView = 'pages')}>
-          <Icon icon={BookOpen} size={15} /> {t('Pagine')}
-        </button>
+      <div class="seg" role="radiogroup" aria-label={t('Vista del PDF')} data-tour="views">
+        {#each VIEWS as v (v.id)}
+          <button role="radio" aria-checked={doc.pdfView === v.id} class:on={doc.pdfView === v.id} onclick={() => void setPdfView(v.id)} title={t(v.tip)}>
+            <Icon icon={v.icon} size={15} /> {t(v.label)}
+          </button>
+        {/each}
       </div>
       <span class="sep"></span>
     {/if}
@@ -96,7 +104,7 @@
       {/each}
     </div>
     <span class="sep"></span>
-    <button class="tb note" onmousedown={keep} onclick={actions.startNote} disabled={ui.selectionEmpty || doc.pdfView === 'pages'} title={tip('Nota sul testo selezionato', 'Ctrl+M')}>
+    <button class="tb note" data-tour="note" onmousedown={keep} onclick={actions.startNote} disabled={!canNote} title={tip('Nota sul testo selezionato', 'Ctrl+M')}>
       <Icon icon={NotebookPen} /> <span>{t('Nota')}</span>
     </button>
     {#if doc.readKind === 'pdf'}
@@ -153,12 +161,22 @@
     <button class="icon-btn" aria-pressed={active.code} onmousedown={keep} onclick={() => inline('code')} title={tip('Codice nel testo', 'Ctrl+E')} aria-label={t('Codice nel testo')}><Icon icon={Code} /></button>
     <span class="sep"></span>
     <button class="icon-btn" aria-pressed={active.link} onmousedown={keep} onclick={() => editor.requestLink()} title={tip('Collegamento', 'Ctrl+K')} aria-label={t('Collegamento')}><Icon icon={Link} /></button>
-    <button class="tb cite" onmousedown={keep} onclick={actions.cite} title={tip('Cita un\'opera della bibliografia', 'Ctrl+Shift+C')}>
+    <button class="tb cite" data-tour="cite" onmousedown={keep} onclick={actions.cite} title={tip('Cita un\'opera della bibliografia', 'Ctrl+Shift+C')}>
       <Icon icon={Quote} /> <span>{t('Cita')}</span>
     </button>
-    <button class="tb note" onmousedown={keep} onclick={actions.startNote} disabled={ui.selectionEmpty} title={tip('Nota sul testo selezionato', 'Ctrl+M')}>
+    <button class="tb note" data-tour="note" onmousedown={keep} onclick={actions.startNote} disabled={!canNote} title={tip('Nota sul testo selezionato', 'Ctrl+M')}>
       <Icon icon={NotebookPen} /> <span>{t('Nota')}</span>
     </button>
+    {#if doc.derived?.kind === 'pdf' && pagesAvailable()}
+      <span class="sep"></span>
+      <div class="seg compact" role="radiogroup" aria-label={t('Vista del PDF')}>
+        {#each VIEWS as v (v.id)}
+          <button role="radio" aria-checked={doc.pdfView === v.id} class:on={doc.pdfView === v.id} onmousedown={keep} onclick={() => void setPdfView(v.id)} title="{t(v.label)}: {t(v.tip)}" aria-label={t(v.label)}>
+            <Icon icon={v.icon} size={15} />
+          </button>
+        {/each}
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -326,6 +344,9 @@
     color: var(--ink);
     box-shadow: var(--shadow-s);
   }
+  .seg.compact button {
+    padding: 0 7px;
+  }
   .state-mark {
     width: 9px;
     height: 9px;
@@ -346,9 +367,16 @@
       display: none;
     }
   }
-  @media (max-width: 1180px) {
+  @media (max-width: 1280px) {
     .bar.reading .tb.edit span {
       display: none;
+    }
+  }
+  /* Finestra stretta: le viste del PDF restano solo con l'icona. */
+  @media (max-width: 1120px) {
+    .bar.reading .seg:first-child button {
+      font-size: 0;
+      gap: 0;
     }
   }
   @media (max-width: 980px) {

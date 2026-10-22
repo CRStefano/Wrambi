@@ -42,6 +42,9 @@
   --rubric: #c8102e;
   --rubric-wash: rgba(200, 16, 46, 0.075);
   --rubric-line: rgba(200, 16, 46, 0.55);
+  /* Evidenziatore: giallo come quello su carta. */
+  --marker: rgba(255, 210, 40, 0.42);
+  --marker-strong: #e0a800;
   --link: #2450b2;
   --sel: #d5e2fb;
   --focus: #2f62d0;
@@ -70,6 +73,8 @@
   --rubric: #ff7383;
   --rubric-wash: rgba(255, 115, 131, 0.12);
   --rubric-line: rgba(255, 115, 131, 0.7);
+  --marker: rgba(255, 205, 60, 0.26);
+  --marker-strong: #f2c94c;
   --link: #93b4ff;
   --sel: #33436a;
   --focus: #93b4ff;
@@ -432,4 +437,110 @@ textarea {
 .doc-preview .img-missing {
   color: var(--ink-3);
   font-style: italic;
+}
+
+/* ───────── Pagine PDF: note e evidenziazioni di Wrambi, testo selezionabile ───────── */
+
+.pdf-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pdf-mark {
+  position: absolute;
+  border-radius: 2px;
+  transition: background-color 300ms;
+}
+.pdf-mark.note {
+  background: rgb(200 16 46 / 0.1);
+  border-bottom: 2px solid rgb(200 16 46 / 0.75);
+}
+.pdf-mark.highlight {
+  background: rgb(255 210 40 / 0.45);
+  mix-blend-mode: multiply;
+}
+.pdf-mark.flash {
+  background: rgb(200 16 46 / 0.3);
+}
+.pdf-mark.highlight.flash {
+  background: rgb(240 170 0 / 0.6);
+}
+.pdf-mark-num {
+  position: absolute;
+  font: 700 10px/1 var(--ui);
+  color: #c8102e;
+  pointer-events: none;
+}
+
+/* Livello di testo di pdf.js: invisibile ma selezionabile. */
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+  /* Si seleziona solo il testo, non lo spazio vuoto tra un frammento e l'altro. */
+  user-select: none;
+  -webkit-user-select: none;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.textLayer span,
+.textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent {
+  display: contents;
+}
+.textLayer ::selection {
+  background: rgb(47 98 208 / 0.28);
+  color: transparent;
+}
+.textLayer br::selection {
+  background: transparent;
+}
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+.textLayer[data-main-rotation='90'] {
+  transform: rotate(90deg) translateY(-100%);
+}
+.textLayer[data-main-rotation='180'] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.textLayer[data-main-rotation='270'] {
+  transform: rotate(270deg) translateX(-100%);
 }

@@ -10,6 +10,8 @@ export interface NoteRange {
   id: string;
   from: number;
   to: number;
+  /** Evidenziazione (gialla, senza numero) invece di una nota. */
+  kind?: 'highlight';
 }
 
 export const setNotes = StateEffect.define<NoteRange[]>();
@@ -66,7 +68,7 @@ export const notesField = StateField.define<NoteRange[]>({
         // Il testo inserito ai bordi non entra nella nota.
         const from = tr.changes.mapPos(n.from, 1);
         const to = Math.max(from, tr.changes.mapPos(n.to, -1));
-        return { id: n.id, from, to };
+        return { ...n, from, to };
       });
     }
     for (const e of tr.effects) {
@@ -90,16 +92,19 @@ const noteDecorations = EditorView.decorations.compute([notesField, flashField],
   const ranges = [...state.field(notesField)].filter((n) => n.to > n.from).sort((a, b) => a.from - b.from || a.to - b.to);
   const flashing = state.field(flashField);
   const decos: Range<Decoration>[] = [];
-  ranges.forEach((n, i) => {
+  let number = 0;
+  for (const n of ranges) {
+    const base = n.kind === 'highlight' ? 'cm-highlight' : 'cm-note';
     decos.push(
       Decoration.mark({
-        class: n.id === flashing ? 'cm-note cm-note-flash' : 'cm-note',
+        class: n.id === flashing ? `${base} cm-note-flash` : base,
         attributes: { 'data-note-id': n.id },
         inclusive: false,
       }).range(n.from, n.to),
     );
-    decos.push(Decoration.widget({ widget: new NoteRefWidget(i + 1, n.id), side: 1 }).range(n.to));
-  });
+    // Le evidenziazioni non hanno numero: solo le note sono «a piè di pagina».
+    if (n.kind !== 'highlight') decos.push(Decoration.widget({ widget: new NoteRefWidget(++number, n.id), side: 1 }).range(n.to));
+  }
   return Decoration.set(decos, true) as DecorationSet;
 });
 

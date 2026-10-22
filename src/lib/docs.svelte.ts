@@ -6,8 +6,10 @@ import { backend, basename, dialogs, dirname, extname, joinPath, normPath, relat
 import { converter } from './convert/client';
 import { readEpub, readHtml } from './convert/epub';
 import { editor, type EditorLanguage } from './editor/controller';
+import type { NoteRange } from './editor/notes';
 import { makeAnchor, resolveAnchor } from './notes/anchor';
-import { closePdfDocument, extractPdfText, openPdf } from './reader/pdf';
+import { buildPdfIndex, closePdfDocument, extractPdfText, openPdf } from './reader/pdf';
+import type { PdfIndex } from './reader/textmap';
 import { exportTo } from './exporter';
 import { keys, locale, t, tn } from './i18n';
 import {
@@ -46,8 +48,8 @@ export function openFilters() {
   ];
 }
 
-/** PDF aperto (per la vista a pagine). */
-export const reader = $state<{ pdf: PDFDocumentProxy | null; loading: string | null }>({ pdf: null, loading: null });
+/** PDF aperto (per la vista a pagine) e il testo delle sue pagine (per le corrispondenze con il testo). */
+export const reader = $state<{ pdf: PDFDocumentProxy | null; index: PdfIndex | null; loading: string | null }>({ pdf: null, index: null, loading: null });
 
 let currentText = '';
 let version = 0;
@@ -88,25 +90,42 @@ export function notesFor(key: string): Note[] {
   return notesStore.list.filter((n) => n.docKey === key);
 }
 
-/** Ricolloca le note sul testo appena aperto. */
-function resolveNotes(key: string, text: string) {
-  const ranges = [];
+/**
+ * Ricolloca le note sul testo appena aperto. Sul testo originale di un PDF,
+ * EPUB o HTML conta prima l'ancoraggio originale; su una versione modificata
+ * quello aggiornato mentre si scriveva.
+ */
+function resolveNotes(key: string, text: string, original: boolean) {
+  const ranges: NoteRange[] = [];
   for (const n of notesStore.list) {
     if (n.docKey !== key) continue;
-    const r = resolveAnchor(text, n);
+    const anchors = original ? [n.src, n] : [n, n.src];
+    let r: { from: number; to: number } | null = null;
+    for (const a of anchors) {
+      if (a && (r = resolveAnchor(text, { from: n.from, to: n.to, ...a }))) break;
+    }
     if (r) {
       n.from = r.from;
       n.to = r.to;
       n.orphan = false;
-      ranges.push({ id: n.id, from: r.from, to: r.to });
+      // Le note scritte prima che esistesse l'ancoraggio originale lo ricevono qui.
+      if (original && !n.src && doc.readKind) n.src = sourceAnchor(makeAnchor(text, r.from, r.to));
+      ranges.push({ id: n.id, from: r.from, to: r.to, ...(n.kind ? { kind: n.kind } : {}) });
     } else n.orphan = true;
   }
   return ranges;
 }
 
+/** Ancoraggio originale per le note dei documenti in lettura (PDF, EPUB, HTML). */
+function sourceAnchor(a: { quote: string; prefix: string; suffix: string }) {
+  return { quote: a.quote, prefix: a.prefix, suffix: a.suffix };
+}
+
 /** Copia nelle note le posizioni aggiornate dall'editor. */
 export function syncNotes() {
   if (!doc.key) return;
+  // In lettura il testo non cambia: gli ancoraggi restano quelli scritti.
+  if (doc.mode === 'read') return;
   const text = editor.getText();
   const ranges = editor.noteRanges();
   let changed = false;
@@ -129,22 +148,41 @@ export function syncNotes() {
   if (changed) save.notes();
 }
 
-export function createNote(sel: { from: number; to: number }, text: string): Note | null {
+export function createNote(sel: { from: number; to: number }, text: string, kind?: 'highlight'): Note | null {
   const body = editor.getText();
+  const anchor = makeAnchor(body, sel.from, sel.to);
   const n: Note = {
     id: newId(),
     docKey: doc.key,
-    docName: doc.draftId ? doc.title || t('Senza titolo') : doc.name,
+    // Una bozza porta il suo titolo; un PDF (anche mentre se ne modifica il testo) il nome del file.
+    docName: doc.draftId && !doc.derived ? doc.title || t('Senza titolo') : doc.name,
     docPath: doc.path,
-    ...makeAnchor(body, sel.from, sel.to),
+    ...anchor,
     text: text.trim(),
     created: Date.now(),
     updated: Date.now(),
+    ...(kind ? { kind } : {}),
+    ...(doc.readKind ? { src: sourceAnchor(anchor) } : {}),
   };
   notesStore.list.push(n);
-  editor.addNoteRange({ id: n.id, from: n.from, to: n.to });
+  editor.addNoteRange({ id: n.id, from: n.from, to: n.to, ...(kind ? { kind } : {}) });
   save.notes();
   return n;
+}
+
+/** Trasforma un'evidenziazione in nota (o il contrario). */
+export function setNoteKind(id: string, kind: 'note' | 'highlight') {
+  const n = notesStore.list.find((x) => x.id === id);
+  if (!n) return;
+  if (kind === 'highlight') n.kind = 'highlight';
+  else delete n.kind;
+  n.updated = Date.now();
+  if (n.docKey === doc.key && !n.orphan) {
+    const live = editor.noteRanges().find((r) => r.id === id);
+    editor.removeNoteRange(id);
+    editor.addNoteRange({ id, from: live?.from ?? n.from, to: live?.to ?? n.to, ...(n.kind ? { kind: n.kind } : {}) });
+  }
+  save.notes();
 }
 
 export function updateNote(id: string, text: string) {
@@ -180,7 +218,7 @@ export function deleteNotes(ids: string[]) {
     run: () => {
       for (const { index, note } of removed) {
         notesStore.list.splice(Math.min(index, notesStore.list.length), 0, note);
-        if (note.docKey === doc.key && !note.orphan) editor.addNoteRange({ id: note.id, from: note.from, to: note.to });
+        if (note.docKey === doc.key && !note.orphan) editor.addNoteRange({ id: note.id, from: note.from, to: note.to, ...(note.kind ? { kind: note.kind } : {}) });
       }
       save.notes();
     },
@@ -199,11 +237,31 @@ function duplicateNotesTo(fromKey: string, toKey: string, toName: string, toPath
     if (n.docKey !== fromKey) continue;
     const id = newId();
     map.set(n.id, id);
-    copies.push({ ...$state.snapshot(n), id, docKey: toKey, docName: toName, docPath: toPath, created: Date.now(), updated: Date.now() });
+    const copy: Note = { ...$state.snapshot(n), id, docKey: toKey, docName: toName, docPath: toPath, created: Date.now(), updated: Date.now() };
+    // Il testo della copia è quello modificato: il suo ancoraggio originale è quello attuale.
+    if (copy.src) copy.src = sourceAnchor(copy);
+    copies.push(copy);
   }
   if (!copies.length) return;
   notesStore.list.push(...copies);
   editor.setNoteRanges(editor.noteRanges().filter((r) => map.has(r.id)).map((r) => ({ ...r, id: map.get(r.id)! })));
+  save.notes();
+}
+
+/**
+ * Dà a una copia salvata di un file (per esempio un PDF modificato) le note
+ * dell'originale, che restano anche sull'originale.
+ */
+export function copyNotesToFile(fromKey: string, dest: string) {
+  const toKey = keyForPath(dest);
+  if (toKey === fromKey) return;
+  const copies: Note[] = [];
+  for (const n of notesStore.list) {
+    if (n.docKey !== fromKey) continue;
+    copies.push({ ...$state.snapshot(n), id: newId(), docKey: toKey, docName: basename(dest), docPath: dest, orphan: false, created: Date.now(), updated: Date.now() });
+  }
+  if (!copies.length) return;
+  notesStore.list.push(...copies);
   save.notes();
 }
 
@@ -238,8 +296,9 @@ export function scheduleAnalyze(delay = 250) {
     doc.title = r.title;
     if (doc.draftId) {
       if (session.drafts[doc.draftId]) session.drafts[doc.draftId].title = r.title;
-      // Le note di una bozza portano il titolo che la bozza ha in quel momento.
-      for (const n of notesStore.list) if (n.docKey === doc.key && n.docName !== r.title) n.docName = r.title;
+      // Le note di una bozza portano il titolo che la bozza ha in quel momento;
+      // quelle di un PDF di cui si modifica il testo restano col nome del file.
+      if (!doc.derived) for (const n of notesStore.list) if (n.docKey === doc.key && n.docName !== r.title) n.docName = r.title;
     }
   }, delay);
 }
@@ -418,7 +477,7 @@ export async function flushDocument() {
 
 function loadIntoEditor(text: string, lang: EditorLanguage, ro: boolean, key: string) {
   currentText = text;
-  const ranges = resolveNotes(key, text);
+  const ranges = resolveNotes(key, text, ro);
   editor.load(text, lang, ro, ranges, { spellcheck: settings.spellcheck, typewriter: settings.typewriter, caret: settings.caret });
   editor.configure({ focusDim: ui.focus && settings.focusDim });
   version = savedVersion = 0;
@@ -503,9 +562,35 @@ async function canLeave(): Promise<boolean> {
 }
 
 function closePdf() {
+  pdfLoad++;
   if (reader.pdf) {
     closePdfDocument(reader.pdf);
     reader.pdf = null;
+  }
+  reader.index = null;
+}
+
+let pdfLoad = 0;
+
+/**
+ * Apre in sottofondo le pagine del PDF originale di una modifica del testo,
+ * così si possono guardare (e annotare) mentre si scrive.
+ */
+async function loadOriginalPages(path: string, key: string) {
+  const ticket = ++pdfLoad;
+  const alive = () => ticket === pdfLoad && doc.key === key;
+  try {
+    const info = await backend.fileInfo(path);
+    if (!info.exists || !alive()) return;
+    const pdf = await openPdf(await backend.readBinary(path));
+    if (!alive()) {
+      closePdfDocument(pdf);
+      return;
+    }
+    reader.pdf = pdf;
+    reader.index = await buildPdfIndex(pdf, alive);
+  } catch {
+    /* senza pagine si continua a scrivere */
   }
 }
 
@@ -520,6 +605,9 @@ export async function openPath(path: string, opts: { skipFlush?: boolean; asSour
   const key = keyForPath(path);
   const name = basename(path);
   const asSource = opts.asSource && (ext === 'html' || ext === 'htm');
+  // Si riapre lo stesso PDF (dopo averlo modificato): resta la vista scelta.
+  const view = doc.pdfView;
+  const keepView = doc.readKind === 'pdf' && ext === 'pdf' && key === doc.key;
 
   try {
     if (EDITABLE.includes(ext) || asSource) {
@@ -541,6 +629,7 @@ export async function openPath(path: string, opts: { skipFlush?: boolean; asSour
       let banner: (typeof doc)['banner'] = null;
       let pdfPages = 0;
       let pdf: PDFDocumentProxy | null = null;
+      let pdfIndex: PdfIndex | null = null;
       if (ext === 'pdf') {
         readKind = 'pdf';
         const bytes = await backend.readBinary(path);
@@ -548,6 +637,7 @@ export async function openPath(path: string, opts: { skipFlush?: boolean; asSour
         const res = await extractPdfText(pdf, (d, total) => (reader.loading = t('Estrazione del testo: pagina {n} di {total}', { n: d, total })));
         text = res.text;
         pdfPages = res.pages;
+        pdfIndex = res.index;
         banner = {
           kind: 'info',
           text:
@@ -572,7 +662,8 @@ export async function openPath(path: string, opts: { skipFlush?: boolean; asSour
       }
       closePdf();
       reader.pdf = pdf;
-      resetDoc({ key, name, path, format: 'md', mode: 'read', readKind, banner, pdfPages, pdfView: 'text' });
+      reader.index = pdfIndex;
+      resetDoc({ key, name, path, format: 'md', mode: 'read', readKind, banner, pdfPages, pdfView: keepView ? view : 'text' });
       loadIntoEditor(text, 'md', true, key);
       offerResume(path);
     }
@@ -643,7 +734,6 @@ export async function openNoteContext(note: Note) {
     }
     if (note.docKey !== doc.key) return false;
   }
-  if (doc.readKind === 'pdf') doc.pdfView = 'text';
   return true;
 }
 
@@ -679,7 +769,8 @@ export async function startEditing() {
   doc.derived = { kind, targetFormat: null, pending: false };
   doc.mode = 'edit';
   doc.format = 'md';
-  doc.pdfView = 'text';
+  // Dalle pagine si passa al testo affiancato alle pagine: si scrive guardando l'originale.
+  if (doc.pdfView === 'pages') doc.pdfView = kind === 'pdf' && reader.pdf ? 'split' : 'text';
   session.drafts[id] = { title: doc.title || displayName(doc.name), updated: Date.now(), origin: { path: doc.path, kind, targetFormat: null } };
   editor.setEditable(true, 'md', { spellcheck: settings.spellcheck, typewriter: settings.typewriter });
   // Gli indicatori di pagina servono per leggere, non fanno parte del testo da salvare.
@@ -717,6 +808,7 @@ export async function openDerivedDraft(id: string) {
   loadIntoEditor(text, 'md', false, doc.key);
   derivedBanner();
   rememberRecent(refOf());
+  if (kind === 'pdf') void loadOriginalPages(path, doc.key);
 }
 
 /** Se c'è una modifica conservata di questo file, la propone. */
@@ -795,6 +887,11 @@ export async function saveChanges(c: SaveChoice): Promise<string | null> {
   let modified: number | null = null;
   if (derivedText) await exportTo(c.format, c.dest, { notes: false });
   else modified = await backend.writeText(c.dest, editor.getText(), doc.encoding === 'utf-8-bom');
+  if (c.replace && derivedText) {
+    // L'originale ora contiene il testo modificato: le note si ritrovano lì.
+    for (const n of notesStore.list) if (n.docKey === oldKey && n.src) n.src = sourceAnchor(n);
+    save.notes();
+  }
 
   if (newKey !== oldKey) {
     if (wasDraft) {

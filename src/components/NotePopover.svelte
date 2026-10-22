@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Trash2, X } from 'lucide';
+  import { Highlighter, NotebookPen, Trash2, X } from 'lucide';
   import Icon from './Icon.svelte';
-  import { createNote, deleteNote, updateNote } from '../lib/docs.svelte';
+  import { createNote, deleteNote, setNoteKind, updateNote } from '../lib/docs.svelte';
   import { editor } from '../lib/editor/controller';
   import { doc, formatDate, notesStore, settings, ui } from '../lib/state.svelte';
   import { keys, t } from '../lib/i18n';
@@ -12,9 +12,10 @@
   let text = $state(existing?.text ?? '');
   let area: HTMLTextAreaElement;
 
+  const highlight = existing?.kind === 'highlight';
   const number = $derived.by(() => {
     if (!existing || existing.orphan) return null;
-    const ranges = editor.noteRanges().filter((r) => r.to > r.from).sort((a, b) => a.from - b.from);
+    const ranges = editor.noteRanges().filter((r) => r.to > r.from && r.kind !== 'highlight').sort((a, b) => a.from - b.from);
     const i = ranges.findIndex((r) => r.id === existing.id);
     return i >= 0 ? i + 1 : null;
   });
@@ -42,6 +43,15 @@
 
   function add() {
     if (p.draft) createNote(p.draft, text);
+    ui.popover = null;
+    editor.focus();
+  }
+
+  function toNote() {
+    if (!existing) return;
+    clearTimeout(timer);
+    updateNote(existing.id, text);
+    setNoteKind(existing.id, 'note');
     ui.popover = null;
     editor.focus();
   }
@@ -74,19 +84,26 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 <div class="backdrop" onclick={() => (existing ? close(true) : close(false))}></div>
-<div class="pop" class:above={!p.below} style="left:{p.x}px;top:{p.y}px" role="dialog" aria-label={t('Nota')} tabindex="-1" onkeydown={onKey}>
+<div class="pop" class:above={!p.below} class:hl={highlight} style="left:{p.x}px;top:{p.y}px" role="dialog" aria-label={highlight ? t('Evidenziazione') : t('Nota')} tabindex="-1" onkeydown={onKey}>
   <header>
-    <span class="num">{number ?? (existing ? '–' : '+')}</span>
+    {#if highlight}
+      <span class="num hl-mark" title={t('Evidenziazione')}><Icon icon={Highlighter} size={13} /></span>
+    {:else}
+      <span class="num">{number ?? (existing ? '–' : '+')}</span>
+    {/if}
     <blockquote>{excerpt(quote)}</blockquote>
     <button class="icon-btn" onclick={() => close(!!existing)} aria-label={t('Chiudi')}><Icon icon={X} size={15} /></button>
   </header>
   {#if existing?.orphan}
     <p class="orphan">{t('Il testo annotato non è più nel documento: la nota è conservata ma non è collegata a nessun punto.')}</p>
   {/if}
-  <textarea bind:this={area} bind:value={text} oninput={onInput} placeholder={t('Scrivi la nota…')} rows="4" spellcheck="true" lang={settings.docLanguage}></textarea>
+  <textarea bind:this={area} bind:value={text} oninput={onInput} placeholder={highlight ? t('Un commento, se vuoi…') : t('Scrivi la nota…')} rows={highlight ? 3 : 4} spellcheck="true" lang={settings.docLanguage}></textarea>
   <footer>
     {#if existing}
       <span class="date">{existing.updated !== existing.created ? t('Modificata {date}', { date: formatDate(existing.updated) }) : t('Creata {date}', { date: formatDate(existing.updated) })}</span>
+      {#if highlight}
+        <button class="btn slim" onclick={toNote} title={t('Trasforma in nota')}><Icon icon={NotebookPen} size={14} />{t('Nota')}</button>
+      {/if}
       <button class="btn danger slim" onclick={remove}><Icon icon={Trash2} size={14} />{t('Elimina')}</button>
       <button class="btn primary slim" onclick={() => close(true)}>{t('Fatto')}</button>
     {:else}
@@ -134,6 +151,20 @@
     display: flex;
     align-items: flex-start;
     gap: 10px;
+  }
+  .pop.hl {
+    border-top-color: var(--marker-strong);
+  }
+  .num.hl-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--marker);
+    color: var(--ink);
+    padding-top: 0;
   }
   .num {
     flex: none;

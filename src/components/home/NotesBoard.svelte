@@ -93,9 +93,9 @@
         <div class="cards">
           {#each notes as n (n.id)}
             <div class="card-wrap">
-              <button class="card" class:orphan={n.orphan || gone} onclick={() => open(n)} oncontextmenu={(e) => noteMenu(e, n)} title={gone ? t('Il documento non esiste più') : t('Apri la nota')}>
+              <button class="card" class:orphan={n.orphan || gone} class:hl={n.kind === 'highlight'} onclick={() => open(n)} oncontextmenu={(e) => noteMenu(e, n)} title={gone ? t('Il documento non esiste più') : t('Apri la nota')}>
                 <blockquote>{excerpt(n.quote, 140)}</blockquote>
-                {#if n.text}<p class="body">{excerpt(n.text, 320)}</p>{:else}<p class="body faint">{t('(nota vuota)')}</p>{/if}
+                {#if n.text}<p class="body">{excerpt(n.text, 320)}</p>{:else if n.kind === 'highlight'}<p class="body faint">{t('Evidenziato')}</p>{:else}<p class="body faint">{t('(nota vuota)')}</p>{/if}
                 <span class="meta">
                   {#if n.orphan && !gone}<span class="warn"><Icon icon={TriangleAlert} size={12} /> {t('testo non trovato')}</span>{/if}
                   <span>{formatDate(n.updated)}</span>
@@ -158,6 +158,9 @@
     background: var(--raised);
     text-align: left;
     color: var(--ink);
+  }
+  .card.hl {
+    border-left-color: var(--marker-strong);
   }
   .card:hover {
     border-color: var(--ink-4);
@@ -271,6 +274,16 @@
     font-style: italic;
     line-height: 1.45;
     color: var(--rubric);
+  }
+  /* Evidenziazioni: il passo su fondo giallo, come nel testo. */
+  .hl blockquote {
+    color: var(--ink);
+    font-style: normal;
+  }
+  .hl blockquote {
+    padding: 2px 5px;
+    border-radius: 3px;
+    background: var(--marker);
   }
   .orphan blockquote {
     color: var(--ink-3);

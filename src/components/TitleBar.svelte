@@ -76,10 +76,10 @@
         <Icon icon={ArrowLeft} size={15} /><span>{title}</span>
       </button>
     {:else}
-    <button class="icon-btn" aria-pressed={ui.preview} title={`${t('Anteprima e conversione')} (${keys('Ctrl+Shift+P')})`} aria-label={t('Anteprima')} onclick={actions.togglePreview}>
+    <button class="icon-btn" data-tour="preview" aria-pressed={ui.preview} title={`${t('Anteprima e conversione')} (${keys('Ctrl+Shift+P')})`} aria-label={t('Anteprima')} onclick={actions.togglePreview}>
       <Icon icon={Columns2} />
     </button>
-    <button class="icon-btn notes-btn" aria-pressed={ui.notes} title={`${t('Tutte le note')} (${keys('Ctrl+Shift+N')})`} aria-label={t('Note')} onclick={actions.toggleNotes}>
+    <button class="icon-btn notes-btn" data-tour="notes" aria-pressed={ui.notes} title={`${t('Tutte le note')} (${keys('Ctrl+Shift+N')})`} aria-label={t('Note')} onclick={actions.toggleNotes}>
       <Icon icon={MessageSquareText} />
       {#if noteCount}<span class="count">{noteCount}</span>{/if}
     </button>
@@ -88,7 +88,7 @@
     </button>
     {/if}
     <div class="menu-anchor">
-      <button class="icon-btn" aria-pressed={ui.menu} aria-haspopup="menu" title={t('Menu')} aria-label={t('Menu')} onclick={() => (ui.menu = !ui.menu)}>
+      <button class="icon-btn" data-tour="menu" aria-pressed={ui.menu} aria-haspopup="menu" title={t('Menu')} aria-label={t('Menu')} onclick={() => (ui.menu = !ui.menu)}>
         <Icon icon={Ellipsis} />
       </button>
       {#if ui.menu}

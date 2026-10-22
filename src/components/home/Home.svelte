@@ -248,7 +248,7 @@
 {/snippet}
 
 <div class="home" role="region" aria-label={t('Biblioteca')}>
-  <aside class="side">
+  <aside class="side" data-tour="home">
     <button class="new" onclick={newDocumentHere} title={section === 'folder' && folder ? t('Nuovo documento nella cartella {folder}', { folder }) : `${t('Nuovo documento')} (${keys('Ctrl+N')})`}>
       <Icon icon={FilePlus} size={16} /> {t('Nuovo documento')}
     </button>

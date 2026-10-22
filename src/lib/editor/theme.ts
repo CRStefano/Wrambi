@@ -82,6 +82,15 @@ export const editorTheme = EditorView.theme({
     transition: 'background-color 300ms',
   },
   '.cm-note .cm-note': { backgroundColor: 'transparent' },
+  /* Evidenziazioni: il giallo dell'evidenziatore, senza numero */
+  '.cm-highlight': {
+    backgroundColor: 'var(--marker)',
+    borderRadius: '2px',
+    cursor: 'pointer',
+    transition: 'background-color 300ms',
+  },
+  '.cm-highlight .cm-note, .cm-note .cm-highlight': { backgroundColor: 'var(--marker)' },
+  '.cm-highlight.cm-note-flash': { backgroundColor: 'color-mix(in srgb, var(--marker-strong) 55%, transparent)' },
   '.cm-note-flash': { backgroundColor: 'color-mix(in srgb, var(--rubric) 26%, transparent)' },
   '.cm-note-ref': {
     color: 'var(--rubric)',

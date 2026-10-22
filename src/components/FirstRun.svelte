@@ -14,6 +14,8 @@
     save.settings();
     ui.firstRun = false;
     editor.focus();
+    // Subito dopo, il giro di Wrambi (si può rimandare).
+    if (!settings.tourSeen) ui.tour = 0;
   }
 
   async function chooseExisting() {

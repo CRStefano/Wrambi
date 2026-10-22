@@ -85,10 +85,12 @@
         <ol>
           {#each items as n (n.id)}
             <li>
-              <button class="note" class:orphan={n.orphan} onclick={() => go(n)} oncontextmenu={(e) => noteMenu(e, n)}>
+              <button class="note" class:orphan={n.orphan} class:hl={n.kind === 'highlight'} onclick={() => go(n)} oncontextmenu={(e) => noteMenu(e, n)}>
                 <blockquote>{excerpt(n.quote, 120)}</blockquote>
                 {#if n.text}
                   <p class="body">{excerpt(n.text, 220)}</p>
+                {:else if n.kind === 'highlight'}
+                  <p class="body faint">{t('Evidenziato')}</p>
                 {:else}
                   <p class="body faint">{t('(nota vuota)')}</p>
                 {/if}
@@ -273,6 +275,9 @@
     display: grid;
     gap: 6px;
   }
+  .note.hl {
+    border-left-color: var(--marker-strong);
+  }
   .note {
     display: block;
     width: 100%;
@@ -298,6 +303,16 @@
     font-style: italic;
     line-height: 1.4;
     color: var(--rubric);
+  }
+  /* Evidenziazioni: il passo su fondo giallo, come nel testo. */
+  .hl blockquote {
+    color: var(--ink);
+    font-style: normal;
+  }
+  .hl blockquote {
+    padding: 2px 5px;
+    border-radius: 3px;
+    background: var(--marker);
   }
   .orphan blockquote {
     color: var(--ink-3);

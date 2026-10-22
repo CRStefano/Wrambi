@@ -25,6 +25,7 @@
   import VaultSheet from './components/VaultSheet.svelte';
   import ShortcutsSheet from './components/ShortcutsSheet.svelte';
   import FirstRun from './components/FirstRun.svelte';
+  import Tour from './components/Tour.svelte';
   import Toasts from './components/Toasts.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
   import Banner from './components/Banner.svelte';
@@ -95,6 +96,8 @@
         console.error(e);
       }
       ui.firstRun = !settings.firstRunDone;
+      // Chi ha già scelto lingua e cartella (anche in una versione precedente) riceve il giro una volta.
+      if (!ui.firstRun && !settings.tourSeen) ui.tour = 0;
       onBibliographyChange(() => editor.refreshCitations());
       void refreshBibliography(true);
       await restoreSession();
@@ -154,7 +157,7 @@
     {#if ui.home}
       <Home />
     {/if}
-    <section class="page" aria-label={t('Documento')}>
+    <section class="page" aria-label={t('Documento')} data-tour="page">
       <EditorPane />
     </section>
     {#if ui.preview}
@@ -197,6 +200,9 @@
   {/if}
   {#if ui.firstRun && ui.ready}
     <FirstRun />
+  {/if}
+  {#if ui.tour != null && ui.ready && !ui.firstRun}
+    <Tour />
   {/if}
   <Toasts />
 </div>

@@ -10,6 +10,7 @@
 import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 import { bodySize, pageParagraphs, pageToMarkdown, type Para } from './pdftext';
+import { buildIndex, pageText, type PageItem, type PageText, type PdfIndex } from './textmap';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { t } from '../i18n';
 
@@ -46,10 +47,42 @@ export interface ExtractedPdf {
   pages: number;
   /** Pagine senza testo (probabilmente scansioni). */
   emptyPages: number;
+  /** Testo delle pagine, per ritrovare sulle pagine i punti del testo. */
+  index: PdfIndex;
 }
 
-function isTextItem(x: unknown): x is TextItem {
+export function isTextItem(x: unknown): x is TextItem {
   return typeof (x as TextItem).str === 'string';
+}
+
+type PageLike = { getViewport(o: { scale: number }): { height: number; convertToViewportPoint(x: number, y: number): number[] } };
+
+/** Frammenti di testo di una pagina con la loro altezza sulla pagina (0 in alto, 1 in basso). */
+export function pageItems(page: PageLike, items: TextItem[]): PageItem[] {
+  const vp = page.getViewport({ scale: 1 });
+  return items.map((it) => {
+    const h = Math.abs(it.height) || Math.hypot(it.transform[2], it.transform[3]) || 10;
+    const [, y] = vp.convertToViewportPoint(it.transform[4], it.transform[5] + h);
+    return { str: it.str, top: Math.min(1, Math.max(0, y / vp.height)) };
+  });
+}
+
+/** Indice del testo delle pagine di un PDF (per le corrispondenze con il testo). */
+export async function buildPdfIndex(pdf: PDFDocumentProxy, alive: () => boolean = () => true): Promise<PdfIndex | null> {
+  const pages: PageText[] = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    if (!alive()) return null;
+    try {
+      const page = await pdf.getPage(n);
+      const content = await page.getTextContent();
+      pages.push(pageText(pageItems(page, content.items.filter(isTextItem))));
+    } catch {
+      if (!alive()) return null;
+      pages.push(pageText([]));
+    }
+    if (n % 8 === 0) await new Promise((r) => setTimeout(r, 0));
+  }
+  return buildIndex(pages);
 }
 
 /**
@@ -58,11 +91,14 @@ function isTextItem(x: unknown): x is TextItem {
  */
 export async function extractPdfText(pdf: PDFDocumentProxy, onProgress?: (done: number, total: number) => void): Promise<ExtractedPdf> {
   const pages: Para[][] = [];
+  const texts: PageText[] = [];
   let empty = 0;
   for (let n = 1; n <= pdf.numPages; n++) {
     const page = await pdf.getPage(n);
     const content = await page.getTextContent();
-    const paras = pageParagraphs(content.items.filter(isTextItem));
+    const items = content.items.filter(isTextItem);
+    const paras = pageParagraphs(items);
+    texts.push(pageText(pageItems(page, items)));
     if (!paras.length) empty++;
     pages.push(paras);
     page.cleanup();
@@ -80,5 +116,5 @@ export async function extractPdfText(pdf: PDFDocumentProxy, onProgress?: (done: 
   } catch {
     /* metadati assenti */
   }
-  return { title, text: parts.join('\n\n') + '\n', pages: pdf.numPages, emptyPages: empty };
+  return { title, text: parts.join('\n\n') + '\n', pages: pdf.numPages, emptyPages: empty, index: buildIndex(texts) };
 }

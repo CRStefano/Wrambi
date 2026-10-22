@@ -4,13 +4,13 @@
  */
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { backend, basename, dialogs, dirname, extname, stripExt } from '../backend';
-import { openPath, reader } from '../docs.svelte';
+import { copyNotesToFile, openPath, reader } from '../docs.svelte';
 import { t, tn } from '../i18n';
 import { closePdfDocument, openPdf } from '../reader/pdf';
 import { doc, leaveGuard, notify } from '../state.svelte';
 import { buildPdf, PdfEditError, type FontSpec, type ImageData, type Op, type PageRef, type RGB } from './model';
 
-export type Tool = 'select' | 'edit' | 'text' | 'highlight' | 'cover' | 'image';
+export type Tool = 'select' | 'edit' | 'text' | 'highlight' | 'cover' | 'image' | 'note';
 
 interface Snapshot {
   pages: PageRef[];
@@ -281,6 +281,8 @@ export async function saveCopy(): Promise<void> {
     const name = `${stripExt(basename(pdfEdit.path))}_${t('modificato')}.${extname(pdfEdit.path) || 'pdf'}`;
     const dest = await backend.freePath(dirname(pdfEdit.path), name);
     await backend.writeBinary(dest, bytes);
+    // La copia porta con sé le note dell'originale.
+    copyNotesToFile(doc.key, dest);
     await closePdfEdit(true);
     notify(t('Salvato: {name}', { name: basename(dest) }), 'ok');
     await openPath(dest);

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+public/pdfjs/
+src-tauri/target/
+src-tauri/gen/
+installer/
+*.log
+.DS_Store
+Thumbs.db
+.test-tmp/
+tests/out/
+# Generati da npm test, compilati dai test del nucleo
+src-tauri/tests/fixtures/
